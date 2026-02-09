@@ -5,32 +5,123 @@
 <title>Flanker Cognitive Study</title>
 
 <style>
-body{font-family:Arial;background:#f4f6fb;margin:0;text-align:center}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#f4f6fb;margin:0;text-align:center}
 .topbar{
   position:fixed;top:0;width:100%;
-  background:#222;color:white;padding:8px;
-  display:flex;justify-content:space-between;font-size:14px
+  background:#222;color:white;padding:6px 8px;
+  display:flex;justify-content:space-between;align-items:center;font-size:14px
+}
+.topbar-title{
+  font-weight:600;
+  font-size:15px
+}
+.topbar-center{
+  flex:1;
+  text-align:center
+}
+.topbar-right{
+  display:flex;
+  align-items:center;
+  gap:10px
+}
+.topbar button{
+  padding:4px 12px;
+  font-size:13px;
+  margin:5px 20px;
 }
 .card{
-  background:white;width:900px;margin:90px auto;
-  padding:30px;border-radius:12px;
-  box-shadow:0 8px 25px rgba(0,0,0,.12)
+  background:white;width:900px;margin:35px auto 10px;
+  padding:20px;border-radius:12px;
+  box-shadow:0 8px 25px rgba(0,0,0,.12);
+  max-height:610px;
+  overflow-y:auto
 }
+h2{color:#2c3e50;margin-top:0;margin-bottom:15px;font-size:24px;font-weight:600}
+h3{color:#34495e;font-size:16px;font-weight:600;margin-top:0;margin-bottom:8px}
 .flanker{font-size:70px;letter-spacing:12px}
 .feedback{height:26px;margin-top:10px;font-size:20px}
-input,select{margin:5px}
+input,select{
+  padding:6px 10px;
+  border:2px solid #e0e0e0;
+  border-radius:6px;
+  font-size:14px;
+  transition:border-color 0.2s;
+  width:200px;
+  box-sizing:border-box;
+  background:white
+}
+select{
+  cursor:pointer
+}
+input:focus,select:focus{
+  outline:none;
+  border-color:#4a90e2;
+  box-shadow:0 0 0 3px rgba(74,144,226,0.1)
+}
+label{
+  color:#555;
+  font-weight:500;
+  font-size:14px
+}
+button{
+  padding:8px 20px;
+  background:#4a90e2;
+  color:white;
+  border:none;
+  border-radius:6px;
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  transition:background 0.2s;
+  margin-top:10px
+}
+button:hover{
+  background:#357abd
+}
+button:active{
+  transform:translateY(1px)
+}
+.section{
+  background:#fafbfc;
+  padding:12px;
+  border-radius:8px;
+  margin-bottom:12px;
+  border:1px solid #e8eaed
+}
+.form-group{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:8px
+}
+.form-group label{
+  min-width:200px;
+  text-align:right;
+  line-height:1.3
+}
+.centered-form{
+  display:flex;
+  justify-content:center
+}
+.description{
+  font-size:12px;
+  color:#7f8c8d;
+  margin-top:4px;
+  margin-left:215px;
+  font-style:italic
+}
 canvas{margin-top:20px}
-button{padding:8px 14px}
 </style>
 </head>
 
 <body>
 
 <div class="topbar">
-  <div id="status"></div>
-  <div>
+  <div class="topbar-title">Flanker Cognitive Study</div>
+  <div class="topbar-center" id="status"></div>
+  <div class="topbar-right">
     <span id="clock">0:00</span>
-    <button onclick="togglePause()">Pause</button>
+    <button id="pauseBtn" onclick="togglePause()">Pause</button>
   </div>
 </div>
 
@@ -80,15 +171,53 @@ function setupScreen(){
 
  screen(`
  <h2>Setup</h2>
- Playlist<br><select id="pl">${opts}</select><br>
+ 
+ <div class="section">
+   <h3>Number of Test Trials</h3>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+     <div class="form-group">
+       <label>Practice<br><span style="font-weight:normal;font-size:0.9em;">(training)</span></label>
+       <input id="pN" value="5" type="number">
+     </div>
+     <div class="form-group">
+       <label>Baseline<br><span style="font-weight:normal;font-size:0.9em;">(before exposed stimuli)</span></label>
+       <input id="bN" value="25" type="number">
+     </div>
+     <div class="form-group">
+       <label>Post‑Exposure<br><span style="font-weight:normal;font-size:0.9em;">(after exposed stimuli)</span></label>
+       <input id="postN" value="25" type="number">
+     </div>
+     <div class="form-group">
+       <label>Recovery<br><span style="font-weight:normal;font-size:0.9em;">(after short rest)</span></label>
+       <input id="rN" value="25" type="number">
+     </div>
+   </div>
+ </div>
 
- Practice <input id="pN" value="5"><br>
- Baseline <input id="bN" value="25"><br>
- Post <input id="postN" value="25"><br>
- Recovery <input id="rN" value="25"><br>
+ <div class="section">
+   <h3>Task Difficulty</h3>
+   <div class="centered-form">
+     <div class="form-group">
+       <label>Easy trials<br><span style="font-weight:normal;font-size:0.9em;">(Congruent %)</span></label>
+       <input id="pct" value="50" type="number" min="0" max="100">
+     </div>
+   </div>
+   <p class="description" style="text-align:center;margin-left:0;">Remainings are Hard trials (Incongruent)</p>
+ </div>
 
- Congruent % <input id="pct" value="50"><br>
- Exposure minutes <input id="mins" value="5"><br><br>
+ <div class="section">
+   <h3>Rapid Change Stimuli Exposure</h3>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+     <div class="form-group">
+       <label>Rapid Change Stimuli Type</label>
+       <select id="pl">${opts}</select>
+     </div>
+     <div class="form-group">
+       <label>Exposure minutes</label>
+       <input id="mins" value="5" type="number" min="1">
+     </div>
+   </div>
+ </div>
 
  <button onclick="saveSetup()">Next</button>
  `);
@@ -113,36 +242,58 @@ function demographics(){
  screen(`
  <h2>Participant Info</h2>
 
- Age<br>
- <input id="age" type="number" min="5" max="100"><br><br>
+ <div class="section">
+   <div class="form-group">
+     <label>Age</label>
+     <input id="age" type="number" min="5" max="100" placeholder="Enter age">
+   </div>
 
- Gender<br>
- <select id="gender">
-   <option>Male</option>
-   <option>Female</option>
-   <option>Skip</option>
- </select><br><br>
+   <div class="form-group">
+     <label>Gender</label>
+     <select id="gender">
+       <option value="">Select...</option>
+       <option>Male</option>
+       <option>Female</option>
+       <option>Skip</option>
+     </select>
+   </div>
 
- Grade<br>
- <select id="grade">
-   <option>KG</option>
-   ${Array.from({length:12},(_,i)=>`<option>G${i+1}</option>`).join("")}
-   <option>College</option>
-   <option>Work</option>
-   <option>Skip</option>
- </select><br><br>
+   <div class="form-group">
+     <label>Grade</label>
+     <select id="grade">
+       <option value="">Select...</option>
+       <option>KG</option>
+       ${Array.from({length:12},(_,i)=>`<option>G${i+1}</option>`).join("")}
+       <option>College</option>
+       <option>Work</option>
+       <option>Skip</option>
+     </select>
+   </div>
+ </div>
 
- Daily screen time (hrs)<br>
- <input id="screenTime" type="number" step="0.5"><br><br>
+ <div class="section">
+   <div class="form-group">
+     <label>Daily screen time (hrs)</label>
+     <input id="screenTime" type="number" step="0.5" min="0" placeholder="0.0">
+   </div>
 
- Sleep last night (hrs)<br>
- <input id="sleep" type="number" step="0.5"><br><br>
+   <div class="form-group">
+     <label>Sleep last night (hrs)</label>
+     <input id="sleep" type="number" step="0.5" min="0" max="24" placeholder="0.0">
+   </div>
 
- Caffeine drinks today (#)<br>
- <input id="caff" type="number" min="0"><br><br>
+   <div class="form-group">
+     <label>Caffeine drinks today (#)</label>
+     <input id="caff" type="number" min="0" placeholder="0">
+   </div>
+ </div>
 
- Notes<br>
- <input id="notes" style="width:320px"><br><br>
+ <div class="section">
+   <div class="form-group">
+     <label>Notes</label>
+     <input id="notes" style="width:100%;max-width:500px;" placeholder="Optional notes">
+   </div>
+ </div>
 
  <button onclick="saveDemo()">Continue</button>
  `);
@@ -191,8 +342,15 @@ async function runBlock(name,n,practice=false){
   updateStatus(`${name} ${blockIndex}/${blockTotal}`);
 
   const tr=trials[i];
+  const blockTitles = {
+    "practice": "Practice",
+    "baseline": "Baseline",
+    "post": "Post-Exposure",
+    "recovery": "Recovery"
+  };
+  const blockTitle = blockTitles[name] || name.charAt(0).toUpperCase() + name.slice(1);
 
-  screen(`<div class="flanker">${tr.s}</div><div class="feedback" id="fb"></div>`);
+  screen(`<h2>${blockTitle}</h2><div class="flanker">${tr.s}</div><div class="feedback" id="fb"></div>`);
 
   const start=performance.now();
 
@@ -234,6 +392,7 @@ async function exposure(){
  updateStatus("Exposure");
 
  screen(`
+ <h2>Rapid Change Stimuli Exposure</h2>
  <iframe width="720" height="420" 
  src="${SETTINGS.playlist}" title="YouTube video player" frameborder="0" 
  allow="autoplay"></iframe>
@@ -304,12 +463,22 @@ function summaryScreen(){
  };
 
  screen(`
-   <h2>Summary</h2>
-   Baseline cost: ${summaryData.baseline_cost} ms<br>
-   Post cost: ${summaryData.post_cost} ms<br>
-   Recovery cost: ${summaryData.recovery_cost} ms<br><br>
-   Files downloading automatically...
- `);
+  <h2>Summary</h2>
+  <p><strong>Thank you for participating!</strong></p>
+  <p>
+    Baseline cost: ${summaryData.baseline_cost} ms<br>
+    Post cost: ${summaryData.post_cost} ms<br>
+    Recovery cost: ${summaryData.recovery_cost} ms
+  </p>
+  <p>Results are saved and downloading started.</p>
+`);
+
+ /* change pause button to restart */
+ const pauseBtn = document.getElementById("pauseBtn");
+ if(pauseBtn){
+   pauseBtn.innerText = "Restart";
+   pauseBtn.onclick = () => location.reload();
+ }
 
  /* export both */
  downloadCSV(trialsData, `trials_${pid}.csv`);
