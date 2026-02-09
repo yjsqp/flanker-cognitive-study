@@ -39,9 +39,9 @@ button{padding:8px 14px}
 <script>
 /* ================= PLAYLISTS ================= */
 const PLAYLISTS=[
- {name:"Fast Cuts",id:"https://youtu.be/eQbSiMBrLPw?si=Y2EZlrvLO0SncqiX"},
- {name:"Nature Calm",id:"https://youtu.be/eQbSiMBrLPw?si=Y2EZlrvLO0SncqiX"},
- {name:"Mixed Visuals",id:"https://youtu.be/eQbSiMBrLPw?si=Y2EZlrvLO0SncqiX"}
+ {name:"Fast Cuts",id:"https://www.youtube.com/embed/eQbSiMBrLPw"},
+ {name:"Nature Calm",id:"https://www.youtube.com/embed/eQbSiMBrLPw"},
+ {name:"Mixed Visuals",id:"https://www.youtube.com/embed/eQbSiMBrLPw"}
 ];
 
 /* ================= GLOBALS ================= */
@@ -234,9 +234,9 @@ async function exposure(){
  updateStatus("Exposure");
 
  screen(`
- <iframe width="720" height="420"
- src="https://www.youtube.com/embed/videoseries?list=${SETTINGS.playlist}&autoplay=1"
- allow="autoplay"></iframe>
+ <iframe width="720" height="420" 
+ src="${SETTINGS.playlist}" title="YouTube video player" frameborder="0" 
+ allow="autoplay;"></iframe>
  `);
 
  for(let i=SETTINGS.minutes*60;i>0;i--){
