@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Flanker Study Analyzer</title>
+
+<style>
+body{font-family:Arial;background:#f3f6fb;margin:0;text-align:center}
+.card{
+  background:white;width:1000px;margin:40px auto;padding:25px;
+  border-radius:12px;box-shadow:0 8px 25px rgba(0,0,0,.12)
+}
+button{margin:6px;padding:8px 14px}
+canvas{margin-top:20px}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>Flanker Study Analyzer</h2>
+
+<input type="file" id="files" multiple accept=".csv"><br><br>
+
+<button onclick="merge()">Merge + Analyze</button>
+<button onclick="exportTrials()">Export master_trials.csv</button>
+<button onclick="exportSummary()">Export master_summary.csv</button>
+<button onclick="exportStats()">Export stats_report.csv</button>
+
+<div id="info"></div>
+
+<canvas id="rtChart" width="900" height="280"></canvas>
+<canvas id="accChart" width="900" height="280"></canvas>
+<canvas id="costChart" width="900" height="280"></canvas>
+
+</div>
+
+<script>
+/* ================= STORAGE ================= */
+
+let trialFiles=[];
+let summaryFiles=[];
+
+let masterTrials=[];
+let masterSummary=[];
+let statsRows=[];
+
+/* ================= CSV PARSER ================= */
+
+function parseCSV(text){
+ const rows=text.trim().split("\n").map(r=>r.split(","));
+ const headers=rows.shift();
+ return rows.map(r=>{
+   let obj={};
+   headers.forEach((h,i)=>obj[h]=r[i]);
+   return obj;
+ });
+}
+
+/* ================= FILE LOAD ================= */
+
+files.onchange=async e=>{
+ trialFiles=[];
+ summaryFiles=[];
+
+ for(const f of e.target.files){
+   const text=await f.text();
+   const rows=parseCSV(text);
+
+   if(f.name.includes("trial")) trialFiles.push(rows);
+   if(f.name.includes("summary")) summaryFiles.push(rows);
+ }
+
+ info.innerText=
+   `${trialFiles.length} trial files, ${summaryFiles.length} summary files loaded`;
+};
+
+/* ================= MERGE ================= */
+
+function merge(){
+
+ masterTrials=[];
+ masterSummary=[];
+ statsRows=[];
+
+ trialFiles.forEach(t=>masterTrials.push(...t));
+ summaryFiles.forEach(s=>masterSummary.push(...s));
+
+ computeStats();
+
+ info.innerText=
+   `Merged ${masterSummary.length} participants, ${masterTrials.length} trials`;
+
+ drawCharts();
+}
+
+/* ================= STATS ================= */
+
+function mean(a){return a.reduce((x,y)=>+x + +y,0)/a.length}
+function sd(a){
+ const m=mean(a);
+ return Math.sqrt(mean(a.map(x=>(x-m)**2)));
+}
+
+function ttest(a,b){
+ const ma=mean(a), mb=mean(b);
+ const sa=sd(a), sb=sd(b);
+ return (ma-mb)/Math.sqrt(sa*sa/a.length + sb*sb/b.length);
+}
+
+function computeStats(){
+
+ const base=[], post=[], rec=[];
+
+ masterSummary.forEach(s=>{
+   base.push(+s.baseline_cost);
+   post.push(+s.post_cost);
+   rec.push(+s.recovery_cost);
+ });
+
+ statsRows.push({
+   metric:"mean_cost",
+   baseline:mean(base).toFixed(2),
+   post:mean(post).toFixed(2),
+   recovery:mean(rec).toFixed(2)
+ });
+
+ statsRows.push({
+   metric:"sd_cost",
+   baseline:sd(base).toFixed(2),
+   post:sd(post).toFixed(2),
+   recovery:sd(rec).toFixed(2)
+ });
+
+ statsRows.push({
+   metric:"t_test_base_vs_post",
+   value:ttest(base,post).toFixed(3)
+ });
+
+ statsRows.push({
+   metric:"cohens_d",
+   value:((mean(post)-mean(base))/sd(base)).toFixed(3)
+ });
+}
+
+/* ================= EXPORT ================= */
+
+function download(rows,name){
+ if(!rows.length) return;
+
+ const headers=Object.keys(rows[0]);
+ let csv=headers.join(",")+"\n";
+
+ rows.forEach(r=>{
+   csv+=headers.map(h=>r[h]).join(",")+"\n";
+ });
+
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([csv]));
+ a.download=name;
+ a.click();
+}
+
+function exportTrials(){download(masterTrials,"master_trials.csv")}
+function exportSummary(){download(masterSummary,"master_summary.csv")}
+function exportStats(){download(statsRows,"stats_report.csv")}
+
+/* ================= CHARTS ================= */
+
+function drawBars(canvas,vals,labels,title){
+
+ const ctx=canvas.getContext("2d");
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ ctx.font="18px Arial";
+ ctx.fillText(title,10,20);
+
+ const max=Math.max(...vals);
+ const w=120;
+
+ vals.forEach((v,i)=>{
+   const h=(v/max)*180;
+   ctx.fillStyle="#4b7bec";
+   ctx.fillRect(150+i*220,230-h,w,h);
+   ctx.fillStyle="black";
+   ctx.fillText(labels[i],160+i*220,250);
+   ctx.fillText(Math.round(v),160+i*220,225-h);
+ });
+}
+
+function drawCharts(){
+
+ const baseRT=mean(masterSummary.map(s=>+s.baseline_rt));
+ const postRT=mean(masterSummary.map(s=>+s.post_rt));
+ const recRT=mean(masterSummary.map(s=>+s.recovery_rt));
+
+ drawBars(rtChart,[baseRT,postRT,recRT],["Baseline","Post","Recovery"],"Mean RT (ms)");
+
+ const baseAcc=mean(masterSummary.map(s=>+s.baseline_acc));
+ const postAcc=mean(masterSummary.map(s=>+s.post_acc));
+ const recAcc=mean(masterSummary.map(s=>+s.recovery_acc));
+
+ drawBars(accChart,[baseAcc,postAcc,recAcc],["Baseline","Post","Recovery"],"Accuracy");
+
+ const baseCost=mean(masterSummary.map(s=>+s.baseline_cost));
+ const postCost=mean(masterSummary.map(s=>+s.post_cost));
+ const recCost=mean(masterSummary.map(s=>+s.recovery_cost));
+
+ drawBars(costChart,[baseCost,postCost,recCost],["Baseline","Post","Recovery"],"Interference Cost (ms)");
+}
+</script>
+
+</body>
+</html>

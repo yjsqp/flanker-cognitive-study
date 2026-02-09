@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Flanker Cognitive Study</title>
+
+<style>
+body{font-family:Arial;background:#f4f6fb;margin:0;text-align:center}
+.topbar{
+  position:fixed;top:0;width:100%;
+  background:#222;color:white;padding:8px;
+  display:flex;justify-content:space-between;font-size:14px
+}
+.card{
+  background:white;width:900px;margin:90px auto;
+  padding:30px;border-radius:12px;
+  box-shadow:0 8px 25px rgba(0,0,0,.12)
+}
+.flanker{font-size:70px;letter-spacing:12px}
+.feedback{height:26px;margin-top:10px;font-size:20px}
+input,select{margin:5px}
+canvas{margin-top:20px}
+button{padding:8px 14px}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div id="status"></div>
+  <div>
+    <span id="clock">0:00</span>
+    <button onclick="togglePause()">Pause</button>
+  </div>
+</div>
+
+<div id="app"></div>
+
+<script>
+/* ================= PLAYLISTS ================= */
+const PLAYLISTS=[
+ {name:"Fast Cuts",id:"https://youtu.be/eQbSiMBrLPw?si=Y2EZlrvLO0SncqiX"},
+ {name:"Nature Calm",id:"https://youtu.be/eQbSiMBrLPw?si=Y2EZlrvLO0SncqiX"},
+ {name:"Mixed Visuals",id:"https://youtu.be/eQbSiMBrLPw?si=Y2EZlrvLO0SncqiX"}
+];
+
+/* ================= GLOBALS ================= */
+let pid="P"+Math.floor(Math.random()*1000000);
+let SETTINGS={}, DEMO={};
+let trialsData=[];
+let summaryData=null;
+let paused=false, timerInt, seconds=0;
+let blockTotal=0, blockIndex=0;
+
+const app=document.getElementById("app");
+const status=document.getElementById("status");
+
+/* ================= UI ================= */
+function screen(h){app.innerHTML=`<div class="card">${h}</div>`}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+function shuffle(a){return a.sort(()=>Math.random()-0.5)}
+
+function updateStatus(t=""){status.innerText=`${pid} | ${t}`}
+
+/* ================= TIMER ================= */
+function startTimer(){
+  timerInt=setInterval(()=>{
+    if(!paused){
+      seconds++;
+      clock.innerText=Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0");
+    }
+  },1000);
+}
+function stopTimer(){clearInterval(timerInt)}
+function togglePause(){paused=!paused}
+
+/* ================= SETUP ================= */
+function setupScreen(){
+ let opts=PLAYLISTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+
+ screen(`
+ <h2>Setup</h2>
+ Playlist<br><select id="pl">${opts}</select><br>
+
+ Practice <input id="pN" value="20"><br>
+ Baseline <input id="bN" value="80"><br>
+ Post <input id="postN" value="80"><br>
+ Recovery <input id="rN" value="80"><br>
+
+ Congruent % <input id="pct" value="50"><br>
+ Exposure minutes <input id="mins" value="4"><br><br>
+
+ <button onclick="saveSetup()">Next</button>
+ `);
+}
+
+function saveSetup(){
+ SETTINGS={
+   playlist:pl.value,
+   practice:+pN.value,
+   baseline:+bN.value,
+   post:+postN.value,
+   recovery:+rN.value,
+   pct:+pct.value,
+   minutes:+mins.value
+ };
+ demographics();
+}
+
+/* ================= DEMOGRAPHICS ================= */
+function demographics(){
+
+ screen(`
+ <h2>Participant Info</h2>
+
+ Age<br>
+ <input id="age" type="number" min="5" max="100"><br><br>
+
+ Gender<br>
+ <select id="gender">
+   <option>Male</option>
+   <option>Female</option>
+   <option>Skip</option>
+ </select><br><br>
+
+ Grade<br>
+ <select id="grade">
+   <option>KG</option>
+   ${Array.from({length:12},(_,i)=>`<option>G${i+1}</option>`).join("")}
+   <option>College</option>
+   <option>Work</option>
+   <option>Skip</option>
+ </select><br><br>
+
+ Daily screen time (hrs)<br>
+ <input id="screenTime" type="number" step="0.5"><br><br>
+
+ Sleep last night (hrs)<br>
+ <input id="sleep" type="number" step="0.5"><br><br>
+
+ Caffeine drinks today (#)<br>
+ <input id="caff" type="number" min="0"><br><br>
+
+ Notes<br>
+ <input id="notes" style="width:320px"><br><br>
+
+ <button onclick="saveDemo()">Continue</button>
+ `);
+}
+
+function saveDemo(){
+ DEMO={
+   age:age.value, gender:gender.value, grade:grade.value,
+   screenTime:screenTime.value, sleep:sleep.value,
+   caffeine:caff.value, notes:notes.value
+ };
+ consent();
+}
+
+/* ================= CONSENT ================= */
+function consent(){
+ screen(`
+ <h2>Consent</h2>
+ <p>You will complete attention tasks before and after watching videos.
+ ~15 minutes. You may stop anytime.</p>
+ <button onclick="start()">I Agree</button>
+ `);
+}
+
+/* ================= TRIALS ================= */
+function makeTrials(n){
+ const cong=Math.round(n*SETTINGS.pct/100);
+ const incong=n-cong;
+ let t=[];
+ for(let i=0;i<cong/2;i++){t.push({s:"<<<<<",d:"left",c:"cong"});t.push({s:">>>>>",d:"right",c:"cong"})}
+ for(let i=0;i<incong/2;i++){t.push({s:"<<><<",d:"right",c:"incong"});t.push({s:">><>>",d:"left",c:"incong"})}
+ return shuffle(t).slice(0,n)
+}
+
+/* ================= BLOCK ================= */
+async function runBlock(name,n,practice=false){
+
+ await info(name+" starting");
+
+ const trials=makeTrials(n);
+ blockTotal=n;
+
+ for(let i=0;i<trials.length;i++){
+
+  blockIndex=i+1;
+  updateStatus(`${name} ${blockIndex}/${blockTotal}`);
+
+  const tr=trials[i];
+
+  screen(`<div class="flanker">${tr.s}</div><div class="feedback" id="fb"></div>`);
+
+  const start=performance.now();
+
+  const key=await new Promise(res=>{
+    document.onkeydown=e=>{
+      if(["f","j"].includes(e.key)){document.onkeydown=null;res(e.key)}
+    }
+  });
+
+  const rt=Math.round(performance.now()-start);
+  const correct=(key===(tr.d==="left"?"f":"j"));
+
+  if(practice) fb.innerText=correct?"✔ Correct":"✖ Wrong";
+
+  await wait(1000);
+
+  trialsData.push({
+  pid,
+  block:name,
+  trial:blockIndex,
+  congruency:tr.c,
+  correct: correct?1:0,
+  rt
+});
+
+ }
+}
+
+/* ================= INFO SCREEN ================= */
+async function info(txt){
+ screen(`<h2>${txt}</h2><button onclick="go()">Start</button>`);
+ await new Promise(r=>window.go=r);
+}
+
+/* ================= EXPOSURE ================= */
+async function exposure(){
+ await info("Exposure starting");
+
+ updateStatus("Exposure");
+
+ screen(`
+ <iframe width="720" height="420"
+ src="https://www.youtube.com/embed/videoseries?list=${SETTINGS.playlist}&autoplay=1"
+ allow="autoplay"></iframe>
+ `);
+
+ for(let i=SETTINGS.minutes*60;i>0;i--){
+   updateStatus("Exposure "+i+"s");
+   await wait(1000);
+ }
+}
+
+/* ================= SUMMARY + CHARTS ================= */
+function mean(a){return a.reduce((x,y)=>x+y,0)/a.length}
+
+function compute(block,cond){
+ return mean(data.filter(d=>d.block===block && d.cong===cond && d.correct).map(d=>d.rt))
+}
+
+function summaryScreen(){
+
+ function mean(arr){
+   if(!arr.length) return 0;
+   return arr.reduce((a,b)=>a+b,0)/arr.length;
+ }
+
+ function blockStats(block){
+
+   const rows = trialsData.filter(d=>d.block===block);
+
+   const cong = rows.filter(d=>d.congruency==="cong" && d.correct);
+   const incong = rows.filter(d=>d.congruency==="incong" && d.correct);
+
+   const rtCong = mean(cong.map(d=>d.rt));
+   const rtIncong = mean(incong.map(d=>d.rt));
+
+   return {
+     rt: mean(rows.filter(d=>d.correct).map(d=>d.rt)),
+     acc: mean(rows.map(d=>d.correct)),
+     cost: rtIncong - rtCong
+   };
+ }
+
+ const base = blockStats("baseline");
+ const post = blockStats("post");
+ const rec  = blockStats("recovery");
+
+ /* ---------- build summary object ---------- */
+
+ summaryData = {
+   pid,
+   ...DEMO,
+   ...SETTINGS,
+
+   baseline_cost: Math.round(base.cost),
+   post_cost: Math.round(post.cost),
+   recovery_cost: Math.round(rec.cost),
+
+   delta_post: Math.round(post.cost - base.cost),
+   delta_recovery: Math.round(rec.cost - base.cost),
+
+   baseline_rt: Math.round(base.rt),
+   post_rt: Math.round(post.rt),
+   recovery_rt: Math.round(rec.rt),
+
+   baseline_acc: base.acc.toFixed(3),
+   post_acc: post.acc.toFixed(3),
+   recovery_acc: rec.acc.toFixed(3)
+ };
+
+ screen(`
+   <h2>Summary</h2>
+   Baseline cost: ${summaryData.baseline_cost} ms<br>
+   Post cost: ${summaryData.post_cost} ms<br>
+   Recovery cost: ${summaryData.recovery_cost} ms<br><br>
+   Files downloading automatically...
+ `);
+
+ /* export both */
+ downloadCSV(trialsData, `trials_${pid}.csv`);
+ downloadCSV([summaryData], `summary_${pid}.csv`);
+}
+
+function drawChart(vals){
+ const ctx=c.getContext("2d");
+ const max=Math.max(...vals);
+ const w=150;
+ vals.forEach((v,i)=>{
+   const h=(v/max)*200;
+   ctx.fillStyle="#4b7bec";
+   ctx.fillRect(100+i*200,250-h,w,h);
+   ctx.fillText(["Base","Post","Rec"][i],120+i*200,270);
+ });
+}
+
+/* ================= CSV ================= */
+function downloadCSV(rows, filename){
+
+ const headers = Object.keys(rows[0]);
+
+ let csv = headers.join(",") + "\n";
+
+ rows.forEach(r=>{
+   csv += headers.map(h=>r[h]).join(",") + "\n";
+ });
+
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([csv]));
+ a.download=filename;
+ a.click();
+}
+
+/* ================= FLOW ================= */
+async function start(){
+ startTimer();
+ await keyCheck();   // 👈 NEW confirmation screen
+ await runBlock("practice",SETTINGS.practice,true);
+ await runBlock("baseline",SETTINGS.baseline);
+ await exposure();
+ await runBlock("post",SETTINGS.post);
+ await runBlock("recovery",SETTINGS.recovery);
+ stopTimer();
+ summaryScreen();
+}
+
+async function keyCheck(){
+
+ screen(`
+ <h2>Practice Instructions</h2>
+ <p>
+ Press <b>F</b> for LEFT<br>
+ Press <b>J</b> for RIGHT
+ </p>
+ <p>Press BOTH keys once to begin practice</p>
+ <div id="kstatus"></div>
+ `);
+
+ let f=false, j=false;
+
+ await new Promise(resolve=>{
+   document.onkeydown=e=>{
+     if(e.key==="f") f=true;
+     if(e.key==="j") j=true;
+
+     kstatus.innerText =
+       `F: ${f?"✓":""}   J: ${j?"✓":""}`;
+
+     if(f && j){
+       document.onkeydown=null;
+       resolve();
+     }
+   };
+ });
+}
+
+
+/* ================= START ================= */
+setupScreen();
+</script>
+</body>
+</html>
