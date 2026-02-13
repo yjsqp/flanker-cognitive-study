@@ -205,10 +205,14 @@ function setupScreen(){
  <div class="section">
    <h3>Task Difficulty</h3>
    <div class="centered-form">
-     <div class="form-group">
-       <label>Easy trials<br><span style="font-weight:normal;font-size:0.9em;">(Congruent %)</span></label>
-       <input id="pct" value="50" type="number" min="0" max="100">
-     </div>
+    <div class="form-group">
+      <label>Easy trials<br><span style="font-weight:normal;font-size:0.9em;">(Congruent %)</span></label>
+      <input id="pct" value="50" type="number" min="0" max="100">
+    </div>
+    <div class="form-group">
+      <label>Recovery wait (s)<br><span style="font-weight:normal;font-size:0.9em;">(pause before recovery)</span></label>
+      <input id="recoveryDelay" value="120" type="number" min="0">
+    </div>
    </div>
    <p class="description" style="text-align:center;margin-left:0;">Remainings are Hard trials (Incongruent)</p>
  </div>
@@ -239,7 +243,8 @@ function saveSetup(){
    post:+postN.value,
    recovery:+rN.value,
    pct:+pct.value,
-   minutes:+mins.value
+   minutes:+mins.value,
+   recoveryDelay:+recoveryDelay.value
  };
  demographics();
 }
@@ -415,6 +420,24 @@ async function exposure(){
  }
 }
 
+/* ================= RECOVERY PAUSE ================= */
+async function recoveryPause(seconds){
+  seconds = Number(seconds) || 0;
+  if(seconds <= 0) return;
+
+  screen(`
+    <h2>Short break</h2>
+    <p>Rest for <span id="recCount">${seconds}</span> seconds before the recovery test.</p>
+  `);
+
+  for(let i=seconds;i>0;i--){
+    const el = document.getElementById('recCount');
+    if(el) el.innerText = i;
+    updateStatus('Recovery starts in '+i+'s');
+    await wait(1000);
+  }
+}
+
 /* ================= SUMMARY + CHARTS ================= */
 function mean(a){return a.reduce((x,y)=>x+y,0)/a.length}
 
@@ -532,8 +555,10 @@ async function start(){
  await runBlock("practice",SETTINGS.practice,true);
  await runBlock("baseline",SETTINGS.baseline);
  await exposure();
- await runBlock("post",SETTINGS.post);
- await runBlock("recovery",SETTINGS.recovery);
+  await runBlock("post",SETTINGS.post);
+  // short pause before recovery block if configured
+  await recoveryPause(SETTINGS.recoveryDelay);
+  await runBlock("recovery",SETTINGS.recovery);
  stopTimer();
  summaryScreen();
 }
