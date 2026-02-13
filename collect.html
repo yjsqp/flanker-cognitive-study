@@ -118,7 +118,10 @@ canvas{margin-top:20px}
 
 <div class="topbar">
   <div class="topbar-title">Flanker Cognitive Study</div>
-  <div class="topbar-center" id="status"></div>
+  <div class="topbar-center">
+    <div id="pidDisplay" style="font-weight:700"></div>
+    <div id="status" style="font-size:12px;color:#ddd"></div>
+  </div>
   <div class="topbar-right">
     <span id="clock">0:00</span>
     <button id="pauseBtn" onclick="togglePause()">Pause</button>
@@ -151,7 +154,12 @@ function screen(h){app.innerHTML=`<div class="card">${h}</div>`}
 function wait(ms){return new Promise(r=>setTimeout(r,ms))}
 function shuffle(a){return a.sort(()=>Math.random()-0.5)}
 
-function updateStatus(t=""){status.innerText=`${pid} | ${t}`}
+function updateStatus(t=""){ const s = document.getElementById('status'); if(s) s.innerText = t }
+
+function updateProgress(t=""){ const cp = document.getElementById('cardProgress'); if(cp) cp.innerText = t; else { const p = document.getElementById('progress'); if(p) p.innerText = t } }
+
+// show pid in topbar center
+const pidDisplay = document.getElementById('pidDisplay'); if(pidDisplay) pidDisplay.innerText = pid;
 
 /* ================= TIMER ================= */
 function startTimer(){
@@ -339,7 +347,6 @@ async function runBlock(name,n,practice=false){
  for(let i=0;i<trials.length;i++){
 
   blockIndex=i+1;
-  updateStatus(`${name} ${blockIndex}/${blockTotal}`);
 
   const tr=trials[i];
   const blockTitles = {
@@ -350,7 +357,10 @@ async function runBlock(name,n,practice=false){
   };
   const blockTitle = blockTitles[name] || name.charAt(0).toUpperCase() + name.slice(1);
 
-  screen(`<h2>${blockTitle}</h2><div class="flanker">${tr.s}</div><div class="feedback" id="fb"></div>`);
+  screen(`<h2>${blockTitle} <span id="cardProgress" style="margin-left:10px;"></span></h2><div class="flanker">${tr.s}</div><div class="feedback" id="fb"></div>`);
+
+  // update progress after card is rendered so the span exists
+  updateProgress(`${blockIndex}/${blockTotal}`);
 
   const start=performance.now();
 
@@ -363,9 +373,10 @@ async function runBlock(name,n,practice=false){
   const rt=Math.round(performance.now()-start);
   const correct=(key===(tr.d==="left"?"f":"j"));
 
-  if(practice) fb.innerText=correct?"✔ Correct":"✖ Wrong";
-
-  await wait(1000);
+  if(practice){
+    fb.innerText = correct?"✔ Correct":"✖ Wrong";
+    await wait(1000);
+  }
 
   trialsData.push({
   pid,
@@ -528,30 +539,85 @@ async function start(){
 }
 
 async function keyCheck(){
-
  screen(`
  <h2>Practice Instructions</h2>
  <p>
- Press <b>F</b> for LEFT<br>
- Press <b>J</b> for RIGHT
+ Press <b>F</b> when the middle arrow points left.<br>
+ Press <b>J</b> when the middle arrow points right.
  </p>
- <p>Press BOTH keys once to begin practice</p>
- <div id="kstatus"></div>
+ <p><strong>Where to look:</strong> Keep your eyes on the <em>center (middle) arrow</em> of the stimulus.</p>
+ <p>Press BOTH keys once to begin practice. Each time you press F or J the center arrow will update and be highlighted.</p>
+ <div id="kstatus" style="margin-top:8px;margin-bottom:12px;"></div>
+ <div class="flanker" id="kfl">
+   <span class="s">&lt;</span>
+   <span class="s">&lt;</span>
+   <span class="s center" id="kcenter">-</span>
+   <span class="s">&gt;</span>
+   <span class="s">&gt;</span>
+ </div>
+ <style>
+   #kfl{font-size:54px;letter-spacing:10px;display:inline-block;margin-top:12px}
+   #kfl .s{display:inline-block;width:1ch}
+   #kfl .center{padding:6px 10px;border-radius:6px;transition:background 0.12s, color 0.12s}
+   #kfl .center.highlight{background:yellow;color:#111}
+ </style>
  `);
 
  let f=false, j=false;
 
- await new Promise(resolve=>{
-   document.onkeydown=e=>{
-     if(e.key==="f") f=true;
-     if(e.key==="j") j=true;
+ const kcenter = document.getElementById('kcenter');
+ const spans = Array.from(document.querySelectorAll('#kfl .s'));
 
-     kstatus.innerText =
-       `F: ${f?"✓":""}   J: ${j?"✓":""}`;
+ function showArrow(which){
+  // which: 'left' or 'right'
+  const ch = which === 'left' ? '<' : '>';
+  // set surrounding flanker arrows for context
+  spans.forEach((sp,i)=>{
+    if(i < 2) sp.innerText = ch;
+    else if(i === 2) sp.innerText = ch; // center
+    else sp.innerText = ch;
+  });
+  // highlight only the center
+  kcenter.classList.add('highlight');
+  setTimeout(()=>kcenter.classList.remove('highlight'),250);
+}
+
+ await new Promise(resolve=>{
+   document.onkeydown = e => {
+     if(e.key !== 'f' && e.key !== 'j') return;
+
+     if(e.key === 'f'){
+       f = true;
+       showArrow('left');
+     }
+     if(e.key === 'j'){
+       j = true;
+       showArrow('right');
+     }
+
+     kstatus.innerText = `F: ${f?"✓":""}   J: ${j?"✓":""}`;
 
      if(f && j){
-       document.onkeydown=null;
-       resolve();
+       // both keys pressed: stop key listening and show Start button
+       document.onkeydown = null;
+
+      const startBtn = document.createElement('button');
+      startBtn.innerText = 'Start practice';
+      startBtn.id = 'startPracticeBtn';
+      startBtn.style.display = 'block';
+      startBtn.style.width = '180px';
+      startBtn.style.margin = '12px auto';
+      startBtn.style.clear = 'both';
+      startBtn.style.textAlign = 'center';
+       startBtn.onclick = () => {
+         startBtn.remove();
+         resolve();
+       };
+
+      // insert button after kfl (will render centered below because it's block)
+      const kflEl = document.getElementById('kfl');
+      kflEl.insertAdjacentElement('afterend', startBtn);
+       kstatus.innerText += '  — press Start to begin';
      }
    };
  });
