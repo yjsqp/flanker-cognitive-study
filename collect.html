@@ -145,6 +145,8 @@ let trialsData=[];
 let summaryData=null;
 let paused=false, timerInt, seconds=0;
 let blockTotal=0, blockIndex=0;
+// allow skipping the exposure early
+let exposureSkipRequested = false;
 
 const app=document.getElementById("app");
 const status=document.getElementById("status");
@@ -403,21 +405,37 @@ async function info(txt){
 
 /* ================= EXPOSURE ================= */
 async function exposure(){
- await info("Exposure starting");
+  await info("Exposure starting");
 
- updateStatus("Exposure");
+  // reset skip flag at start
+  exposureSkipRequested = false;
 
- screen(`
- <h2>Rapid Change Stimuli Exposure</h2>
- <iframe width="720" height="420" 
- src="${SETTINGS.playlist}" title="YouTube video player" frameborder="0" 
- allow="autoplay"></iframe>
- `);
+  updateStatus("Exposure");
 
- for(let i=SETTINGS.minutes*60;i>0;i--){
-   updateStatus("Exposure "+i+"s");
-   await wait(1000);
- }
+  screen(`
+  <h2>Rapid Change Stimuli Exposure</h2>
+  <iframe width="720" height="420" 
+  src="${SETTINGS.playlist}" title="YouTube video player" frameborder="0" 
+  allow="autoplay"></iframe>
+  <div style="margin-top:12px;">
+    <button id="skipExposureBtn" onclick="skipExposure()" style="background:#e74c3c;padding:8px 14px;border-radius:6px;color:#fff;border:none;cursor:pointer">Skip exposure</button>
+  </div>
+  `);
+
+  for(let i=SETTINGS.minutes*60;i>0;i--){
+    if(exposureSkipRequested){
+      updateStatus('Exposure skipped');
+      break;
+    }
+    updateStatus("Exposure "+i+"s");
+    await wait(1000);
+  }
+}
+
+// Called from the exposure screen button to request skipping
+function skipExposure(){
+  exposureSkipRequested = true;
+  updateStatus('Exposure skip requested');
 }
 
 /* ================= RECOVERY PAUSE ================= */
