@@ -522,7 +522,9 @@ function summaryScreen(){
     Post cost: ${summaryData.post_cost} ms<br>
     Recovery cost: ${summaryData.recovery_cost} ms
   </p>
-  <p>Results are saved and downloading started.</p>
+  <!--p>Results are saved and downloading started.</p-->
+  <p id="localSaveLine">Saved locally <span id="localStatus">⏳</span></p>
+  <p id="driveUploadLine">Uploaded to Drive <span id="driveStatus">⏳</span></p>
 `);
 
  /* change pause button to restart */
@@ -533,8 +535,18 @@ function summaryScreen(){
  }
 
  /* export both */
- downloadCSV(trialsData, `trials_${pid}.csv`);
- downloadCSV([summaryData], `summary_${pid}.csv`);
+ const trialsBlob  = downloadCSV(trialsData, `trials_${pid}.csv`);
+ const summaryBlob = downloadCSV([summaryData], `summary_${pid}.csv`);
+
+ document.getElementById("localStatus").innerText = "✅";
+
+ // mark 2 uploads pending
+ uploadPending = new Set(["trials","summary"]);
+ document.getElementById("driveStatus").innerText = "⏳";
+
+ uploadCSVToDriveConfirmed(trialsBlob,  `trials_${pid}.csv`,  "trials");
+ uploadCSVToDriveConfirmed(summaryBlob, `summary_${pid}.csv`, "summary");
+
 }
 
 function drawChart(vals){
@@ -551,19 +563,19 @@ function drawChart(vals){
 
 /* ================= CSV ================= */
 function downloadCSV(rows, filename){
+  const headers = Object.keys(rows[0]);
+  let csv = headers.join(",") + "\n";
+  rows.forEach(r => { csv += headers.map(h => r[h]).join(",") + "\n"; });
 
- const headers = Object.keys(rows[0]);
+  const blob = new Blob([csv], { type: "text/csv" });
 
- let csv = headers.join(",") + "\n";
+  // Local download (unchanged behavior)
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
 
- rows.forEach(r=>{
-   csv += headers.map(h=>r[h]).join(",") + "\n";
- });
-
- const a=document.createElement("a");
- a.href=URL.createObjectURL(new Blob([csv]));
- a.download=filename;
- a.click();
+  return blob;
 }
 
 /* ================= FLOW ================= */
@@ -666,6 +678,87 @@ async function keyCheck(){
  });
 }
 
+/* ================= UPLOAD TO DRIVE ================= */
+
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZSkofmyfHIy0N3PRbumPHWPzgGY4zRJYSIW0e1T0Y0a1vrHfnHB2DZVephF65DaOe5w/exec";
+const UPLOAD_SECRET  = "CHANGE_ME_TO_THE_SAME_LONG_RANDOM_STRING";
+
+function ensureUploadIframe(){
+  let f = document.getElementById("uploadFrame");
+  if (!f){
+    f = document.createElement("iframe");
+    f.id = "uploadFrame";
+    f.name = "uploadFrame";
+    f.style.display = "none";
+    document.body.appendChild(f);
+  }
+  return f;
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+async function uploadCSVToDriveConfirmed(blob, filename, tag){
+  ensureUploadIframe();
+  const dataBase64 = await blobToBase64(blob);
+
+  const payload = {
+    secret: UPLOAD_SECRET,
+    filename,
+    mime: "text/csv",
+    dataBase64,
+    tag // "trials" or "summary"
+  };
+
+  // POST via form to hidden iframe (so Apps Script can respond with HTML + postMessage)
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = APPS_SCRIPT_URL;
+  form.target = "uploadFrame";
+
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = "payload";
+  input.value = JSON.stringify(payload);
+  form.appendChild(input);
+
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
+let uploadPending = new Set();
+
+window.addEventListener("message", (ev) => {
+  // Basic origin sanity check (optional but recommended)
+  const okOrigin =
+    typeof ev.origin === "string" &&
+    (ev.origin.includes("script.google.com") || ev.origin.includes("googleusercontent.com"));
+
+  if (!okOrigin) return;
+
+  const msg = ev.data || {};
+  if (!msg || typeof msg.ok !== "boolean") return;
+
+  if (msg.ok && msg.tag) {
+    uploadPending.delete(msg.tag);
+  } else if (msg.tag) {
+    // Failed upload for a known tag
+    uploadPending.delete(msg.tag);
+    document.getElementById("driveStatus").innerText = "❌";
+    return;
+  }
+
+  if (uploadPending.size === 0) {
+    document.getElementById("driveStatus").innerText = "✅";
+  }
+});
 
 /* ================= START ================= */
 setupScreen();
