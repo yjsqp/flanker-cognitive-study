@@ -190,7 +190,7 @@ const PLAYLISTS=[
 
 /* ================= GLOBALS ================= */
 let pid="P"+Math.floor(Math.random()*1000000);
-let SETTINGS={}, DEMO={};
+let SETTINGS={playlist:PLAYLISTS[0].id,practice:5,baseline:25,post:25,recovery:25,pct:50,minutes:17.5,recoveryDelay:300}, DEMO={};
 let trialsData=[];
 let summaryData=null;
 let paused=false, timerInt, seconds=0;
@@ -854,17 +854,13 @@ function welcomeScreen(){
  screen(`
  <h2>Welcome</h2>
  <p style="font-size:16px;margin:30px 0;">Flanker Cognitive Study</p>
- <p style="color:#666;margin:20px 0;">Click the settings icon (⚙️) to configure the experiment, then click the button below to begin.</p>
+ <p style="color:#666;margin:20px 0;">Click the settings icon (⚙️) in the top right to customize settings, or begin below.</p>
  <button onclick="runExperiment()" style="padding:12px 30px;font-size:16px;margin-top:20px;">Run Experiment</button>
  `);
 }
 
 function runExperiment(){
- if(!SETTINGS.playlist){
-   alert("Please configure the setup first by clicking the settings icon (⚙️)");
-   return;
- }
- start();
+ demographics();
 }
 
 welcomeScreen();
