@@ -111,6 +111,48 @@ button:active{
   font-style:italic
 }
 canvas{margin-top:20px}
+.modal{
+  display:none;
+  position:fixed;
+  z-index:1000;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
+  background-color:rgba(0,0,0,0.4)
+}
+.modal.show{display:block}
+.modal-content{
+  background-color:#fefefe;
+  margin:5% auto;
+  padding:20px;
+  border-radius:12px;
+  width:900px;
+  max-height:80vh;
+  overflow-y:auto;
+  box-shadow:0 8px 25px rgba(0,0,0,0.25)
+}
+.modal-close{
+  color:#aaa;
+  float:right;
+  font-size:28px;
+  font-weight:bold;
+  cursor:pointer;
+  transition:color 0.2s
+}
+.modal-close:hover{color:#000}
+.settings-btn{
+  background:none;
+  border:none;
+  color:white;
+  font-size:20px;
+  cursor:pointer;
+  padding:4px 8px;
+  transition:transform 0.2s;
+  margin:0
+}
+.settings-btn:hover{transform:scale(1.15)}
+.settings-btn:active{transform:scale(0.95)}
 </style>
 </head>
 
@@ -123,8 +165,16 @@ canvas{margin-top:20px}
     <div id="status" style="font-size:12px;color:#ddd"></div>
   </div>
   <div class="topbar-right">
+    <button class="settings-btn" onclick="openSetupModal()" title="Setup">⚙️</button>
     <span id="clock">0:00</span>
     <button id="pauseBtn" onclick="togglePause()">Pause</button>
+  </div>
+</div>
+
+<div id="setupModal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeSetupModal()">&times;</span>
+    <div id="modalBody"></div>
   </div>
 </div>
 
@@ -174,6 +224,77 @@ function startTimer(){
 }
 function stopTimer(){clearInterval(timerInt)}
 function togglePause(){paused=!paused}
+
+/* ================= MODAL FUNCTIONS ================= */
+function openSetupModal(){
+  document.getElementById("setupModal").classList.add("show");
+  setupScreenModal();
+}
+
+function closeSetupModal(){
+  document.getElementById("setupModal").classList.remove("show");
+}
+
+function setupScreenModal(){
+ let opts=PLAYLISTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+
+ document.getElementById("modalBody").innerHTML=`
+ <h2>Setup</h2>
+ 
+ <div class="section">
+   <h3>Number of Test Trials</h3>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+     <div class="form-group">
+       <label>Practice<br><span style="font-weight:normal;font-size:0.9em;">(training)</span></label>
+       <input id="pN" value="5" type="number">
+     </div>
+     <div class="form-group">
+       <label>Baseline<br><span style="font-weight:normal;font-size:0.9em;">(before exposed stimuli)</span></label>
+       <input id="bN" value="25" type="number">
+     </div>
+     <div class="form-group">
+       <label>Post‑Exposure<br><span style="font-weight:normal;font-size:0.9em;">(after exposed stimuli)</span></label>
+       <input id="postN" value="25" type="number">
+     </div>
+     <div class="form-group">
+       <label>Recovery<br><span style="font-weight:normal;font-size:0.9em;">(after short rest)</span></label>
+       <input id="rN" value="25" type="number">
+     </div>
+   </div>
+ </div>
+
+ <div class="section">
+   <h3>Task Difficulty</h3>
+   <div class="centered-form">
+    <div class="form-group">
+      <label>Easy trials<br><span style="font-weight:normal;font-size:0.9em;">(Congruent %)</span></label>
+      <input id="pct" value="50" type="number" min="0" max="100">
+    </div>
+    <div class="form-group">
+      <label>Recovery wait (s)<br><span style="font-weight:normal;font-size:0.9em;">(pause before recovery)</span></label>
+      <input id="recoveryDelay" value="300" type="number" min="0">
+    </div>
+   </div>
+   <p class="description" style="text-align:center;margin-left:0;">Remainings are Hard trials (Incongruent)</p>
+ </div>
+
+ <div class="section">
+   <h3>Rapid Change Stimuli Exposure</h3>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+     <div class="form-group">
+       <label>Rapid Change Stimuli Type</label>
+       <select id="pl">${opts}</select>
+     </div>
+     <div class="form-group">
+       <label>Exposure minutes</label>
+       <input id="mins" value="17.5" type="number" min="1" step="0.5">
+     </div>
+   </div>
+ </div>
+
+ <button onclick="saveSetup()">Next</button>
+ `;
+}
 
 /* ================= SETUP ================= */
 function setupScreen(){
@@ -248,6 +369,7 @@ function saveSetup(){
    minutes:+mins.value,
    recoveryDelay:+recoveryDelay.value
  };
+ closeSetupModal();
  demographics();
 }
 
@@ -668,7 +790,24 @@ async function keyCheck(){
 
 
 /* ================= START ================= */
-setupScreen();
+function welcomeScreen(){
+ screen(`
+ <h2>Welcome</h2>
+ <p style="font-size:16px;margin:30px 0;">Flanker Cognitive Study</p>
+ <p style="color:#666;margin:20px 0;">Click the settings icon (⚙️) to configure the experiment, then click the button below to begin.</p>
+ <button onclick="runExperiment()" style="padding:12px 30px;font-size:16px;margin-top:20px;">Run Experiment</button>
+ `);
+}
+
+function runExperiment(){
+ if(!SETTINGS.playlist){
+   alert("Please configure the setup first by clicking the settings icon (⚙️)");
+   return;
+ }
+ start();
+}
+
+welcomeScreen();
 </script>
 </body>
 </html>
