@@ -213,7 +213,7 @@ function setupScreen(){
     </div>
     <div class="form-group">
       <label>Recovery wait (s)<br><span style="font-weight:normal;font-size:0.9em;">(pause before recovery)</span></label>
-      <input id="recoveryDelay" value="120" type="number" min="0">
+      <input id="recoveryDelay" value="300" type="number" min="0">
     </div>
    </div>
    <p class="description" style="text-align:center;margin-left:0;">Remainings are Hard trials (Incongruent)</p>
@@ -227,8 +227,8 @@ function setupScreen(){
        <select id="pl">${opts}</select>
      </div>
      <div class="form-group">
-       <label>Exposure seconds</label>
-       <input id="secs" value="300" type="number" min="1">
+       <label>Exposure minutes</label>
+       <input id="mins" value="5" type="number" min="1">
      </div>
    </div>
  </div>
@@ -245,7 +245,7 @@ function saveSetup(){
    post:+postN.value,
    recovery:+rN.value,
    pct:+pct.value,
-   seconds:+secs.value,
+   minutes:+mins.value,
    recoveryDelay:+recoveryDelay.value
  };
  demographics();
@@ -422,7 +422,7 @@ async function exposure(){
   </div>
   `);
 
-  for(let i=SETTINGS.seconds;i>0;i--){
+  for(let i=SETTINGS.minutes*60;i>0;i--){
     if(exposureSkipRequested){
       updateStatus('Exposure skipped');
       break;
