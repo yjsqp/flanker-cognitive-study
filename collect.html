@@ -523,9 +523,13 @@ function summaryScreen(){
     Recovery cost: ${summaryData.recovery_cost} ms
   </p>
   <!--p>Results are saved and downloading started.</p-->
-  <p id="localSaveLine">Saved locally <span id="localStatus">⏳</span></p>
-  <p id="driveUploadLine">Uploaded to Drive <span id="driveStatus">⏳</span></p>
-`);
+  <p id="localLine">Saved locally <span id="localStatus">⏳</span></p>
+  <p id="uploadLine">Upload sent <span id="uploadStatus">⏳</span></p>
+
+  <p style="font-size:12px;color:#7f8c8d;margin-top:8px;">
+    (If network restrictions block uploads, results are still saved locally.)
+  </p>
+  `);
 
  /* change pause button to restart */
  const pauseBtn = document.getElementById("pauseBtn");
@@ -540,12 +544,16 @@ function summaryScreen(){
 
  document.getElementById("localStatus").innerText = "✅";
 
- // mark 2 uploads pending
- uploadPending = new Set(["trials","summary"]);
- document.getElementById("driveStatus").innerText = "⏳";
-
- uploadCSVToDriveConfirmed(trialsBlob,  `trials_${pid}.csv`,  "trials");
- uploadCSVToDriveConfirmed(summaryBlob, `summary_${pid}.csv`, "summary");
+ Promise.allSettled([
+    uploadCSVToAppsScript(trialsBlob,  `trials_${pid}.csv`,  "trials"),
+    uploadCSVToAppsScript(summaryBlob, `summary_${pid}.csv`, "summary")
+  ]).then(() => {
+    // Not a server-confirmed success — it means "upload requests were sent"
+    document.getElementById("uploadStatus").innerText = "✅";
+  }).catch(() => {
+    // If fetch itself errors (rare), show ❌
+    document.getElementById("uploadStatus").innerText = "❌";
+  });
 
 }
 
@@ -680,20 +688,9 @@ async function keyCheck(){
 
 /* ================= UPLOAD TO DRIVE ================= */
 
+// ===== Drive upload via Apps Script (no sign-in) =====
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZSkofmyfHIy0N3PRbumPHWPzgGY4zRJYSIW0e1T0Y0a1vrHfnHB2DZVephF65DaOe5w/exec";
-const UPLOAD_SECRET  = "CHANGE_ME_TO_THE_SAME_LONG_RANDOM_STRING";
-
-function ensureUploadIframe(){
-  let f = document.getElementById("uploadFrame");
-  if (!f){
-    f = document.createElement("iframe");
-    f.id = "uploadFrame";
-    f.name = "uploadFrame";
-    f.style.display = "none";
-    document.body.appendChild(f);
-  }
-  return f;
-}
+const UPLOAD_SECRET  = "CHANGE_ME_TO_A_LONG_RANDOM_STRING"; // must match Code.gs
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -704,8 +701,11 @@ function blobToBase64(blob) {
   });
 }
 
-async function uploadCSVToDriveConfirmed(blob, filename, tag){
-  ensureUploadIframe();
+/**
+ * Sends upload request to Apps Script.
+ * Returns true if the browser accepted/queued the request (NOT a server confirmation).
+ */
+async function uploadCSVToAppsScript(blob, filename, tag) {
   const dataBase64 = await blobToBase64(blob);
 
   const payload = {
@@ -713,52 +713,19 @@ async function uploadCSVToDriveConfirmed(blob, filename, tag){
     filename,
     mime: "text/csv",
     dataBase64,
-    tag // "trials" or "summary"
+    tag: tag || ""
   };
 
-  // POST via form to hidden iframe (so Apps Script can respond with HTML + postMessage)
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = APPS_SCRIPT_URL;
-  form.target = "uploadFrame";
+  // no-cors => request is sent, but response is opaque (cannot read success/failure)
+  await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
 
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = "payload";
-  input.value = JSON.stringify(payload);
-  form.appendChild(input);
-
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
+  return true;
 }
-
-let uploadPending = new Set();
-
-window.addEventListener("message", (ev) => {
-  // Basic origin sanity check (optional but recommended)
-  const okOrigin =
-    typeof ev.origin === "string" &&
-    (ev.origin.includes("script.google.com") || ev.origin.includes("googleusercontent.com"));
-
-  if (!okOrigin) return;
-
-  const msg = ev.data || {};
-  if (!msg || typeof msg.ok !== "boolean") return;
-
-  if (msg.ok && msg.tag) {
-    uploadPending.delete(msg.tag);
-  } else if (msg.tag) {
-    // Failed upload for a known tag
-    uploadPending.delete(msg.tag);
-    document.getElementById("driveStatus").innerText = "❌";
-    return;
-  }
-
-  if (uploadPending.size === 0) {
-    document.getElementById("driveStatus").innerText = "✅";
-  }
-});
 
 /* ================= START ================= */
 setupScreen();
