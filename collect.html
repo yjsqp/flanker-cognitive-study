@@ -644,8 +644,14 @@ function summaryScreen(){
     Post cost: ${summaryData.post_cost} ms<br>
     Recovery cost: ${summaryData.recovery_cost} ms
   </p>
-  <p>Results are saved and downloading started.</p>
-`);
+  <!--p>Results are saved and downloading started.</p-->
+  <p id="localLine">Saved locally <span id="localStatus">⏳</span></p>
+  <p id="uploadLine">Upload sent <span id="uploadStatus">⏳</span></p>
+
+  <p style="font-size:12px;color:#7f8c8d;margin-top:8px;">
+    (If network restrictions block uploads, results are still saved locally.)
+  </p>
+  `);
 
  /* change pause button to restart */
  const pauseBtn = document.getElementById("pauseBtn");
@@ -655,8 +661,22 @@ function summaryScreen(){
  }
 
  /* export both */
- downloadCSV(trialsData, `trials_${pid}.csv`);
- downloadCSV([summaryData], `summary_${pid}.csv`);
+ const trialsBlob  = downloadCSV(trialsData, `trials_${pid}.csv`);
+ const summaryBlob = downloadCSV([summaryData], `summary_${pid}.csv`);
+
+ document.getElementById("localStatus").innerText = "✅";
+
+ Promise.allSettled([
+    uploadCSVToAppsScript(trialsBlob,  `trials_${pid}.csv`,  "trials"),
+    uploadCSVToAppsScript(summaryBlob, `summary_${pid}.csv`, "summary")
+  ]).then(() => {
+    // Not a server-confirmed success — it means "upload requests were sent"
+    document.getElementById("uploadStatus").innerText = "✅";
+  }).catch(() => {
+    // If fetch itself errors (rare), show ❌
+    document.getElementById("uploadStatus").innerText = "❌";
+  });
+
 }
 
 function drawChart(vals){
@@ -673,19 +693,19 @@ function drawChart(vals){
 
 /* ================= CSV ================= */
 function downloadCSV(rows, filename){
+  const headers = Object.keys(rows[0]);
+  let csv = headers.join(",") + "\n";
+  rows.forEach(r => { csv += headers.map(h => r[h]).join(",") + "\n"; });
 
- const headers = Object.keys(rows[0]);
+  const blob = new Blob([csv], { type: "text/csv" });
 
- let csv = headers.join(",") + "\n";
+  // Local download (unchanged behavior)
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
 
- rows.forEach(r=>{
-   csv += headers.map(h=>r[h]).join(",") + "\n";
- });
-
- const a=document.createElement("a");
- a.href=URL.createObjectURL(new Blob([csv]));
- a.download=filename;
- a.click();
+  return blob;
 }
 
 /* ================= FLOW ================= */
@@ -788,6 +808,46 @@ async function keyCheck(){
  });
 }
 
+/* ================= UPLOAD TO DRIVE ================= */
+
+// ===== Drive upload via Apps Script (no sign-in) =====
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZSkofmyfHIy0N3PRbumPHWPzgGY4zRJYSIW0e1T0Y0a1vrHfnHB2DZVephF65DaOe5w/exec";
+const UPLOAD_SECRET  = "CHANGE_ME_TO_A_LONG_RANDOM_STRING"; // must match Code.gs
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Sends upload request to Apps Script.
+ * Returns true if the browser accepted/queued the request (NOT a server confirmation).
+ */
+async function uploadCSVToAppsScript(blob, filename, tag) {
+  const dataBase64 = await blobToBase64(blob);
+
+  const payload = {
+    secret: UPLOAD_SECRET,
+    filename,
+    mime: "text/csv",
+    dataBase64,
+    tag: tag || ""
+  };
+
+  // no-cors => request is sent, but response is opaque (cannot read success/failure)
+  await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  return true;
+}
 
 /* ================= START ================= */
 function welcomeScreen(){
