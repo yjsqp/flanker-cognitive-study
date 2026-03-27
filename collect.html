@@ -785,6 +785,10 @@ async function keyCheck(){
    <span class="s">&gt;</span>
    <span class="s">&gt;</span>
  </div>
+ <div style="margin-top:18px; display:flex; justify-content:center; gap:20px;">
+   <button id="kBtnF" style="width:90px; font-size:18px;">F</button>
+   <button id="kBtnJ" style="width:90px; font-size:18px;">J</button>
+ </div>
  <style>
    #kfl{font-size:54px;letter-spacing:10px;display:inline-block;margin-top:12px}
    #kfl .s{display:inline-block;width:1ch}
@@ -813,14 +817,12 @@ async function keyCheck(){
 }
 
  await new Promise(resolve=>{
-   document.onkeydown = e => {
-     if(e.key !== 'f' && e.key !== 'j') return;
-
-     if(e.key === 'f'){
+   const pickKey = key => {
+     if(key === 'f'){
        f = true;
        showArrow('left');
      }
-     if(e.key === 'j'){
+     if(key === 'j'){
        j = true;
        showArrow('right');
      }
@@ -830,6 +832,40 @@ async function keyCheck(){
      if(f && j){
        // both keys pressed: stop key listening and show Start button
        document.onkeydown = null;
+       const kBtnF = document.getElementById('kBtnF');
+       const kBtnJ = document.getElementById('kBtnJ');
+       if(kBtnF) kBtnF.onclick = null;
+       if(kBtnJ) kBtnJ.onclick = null;
+
+      const startBtn = document.createElement('button');
+      startBtn.innerText = 'Start practice';
+      startBtn.id = 'startPracticeBtn';
+      startBtn.style.display = 'block';
+      startBtn.style.width = '180px';
+      startBtn.style.margin = '12px auto';
+      startBtn.style.clear = 'both';
+      startBtn.style.textAlign = 'center';
+       startBtn.onclick = () => {
+         startBtn.remove();
+         resolve();
+       };
+
+      // insert button after kfl (will render centered below because it's block)
+      const kflEl = document.getElementById('kfl');
+      kflEl.insertAdjacentElement('afterend', startBtn);
+       kstatus.innerText += '  — press Start to begin';
+     }
+   };
+
+   document.onkeydown = e => {
+     const key = e.key.toLowerCase();
+     if(key === 'f' || key === 'j') pickKey(key);
+   };
+
+   const kBtnF = document.getElementById('kBtnF');
+   const kBtnJ = document.getElementById('kBtnJ');
+   if(kBtnF) kBtnF.onclick = () => pickKey('f');
+   if(kBtnJ) kBtnJ.onclick = () => pickKey('j');
 
       const startBtn = document.createElement('button');
       startBtn.innerText = 'Start practice';
