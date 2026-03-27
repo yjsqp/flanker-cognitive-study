@@ -562,21 +562,35 @@ function skipExposure(){
 }
 
 /* ================= RECOVERY PAUSE ================= */
+// allow skipping the recovery wait early
+let recoverySkipRequested = false;
+
 async function recoveryPause(seconds){
+  recoverySkipRequested = false;
   seconds = Number(seconds) || 0;
   if(seconds <= 0) return;
 
   screen(`
     <h2>Short break</h2>
     <p>Rest for <span id="recCount">${seconds}</span> seconds before the recovery test.</p>
+    <button id="skipRecoveryBtn" onclick="skipRecovery()" style="background:#e74c3c;padding:8px 14px;border-radius:6px;color:#fff;border:none;cursor:pointer;margin-top:12px">Skip break</button>
   `);
 
   for(let i=seconds;i>0;i--){
     const el = document.getElementById('recCount');
     if(el) el.innerText = i;
     updateStatus('Recovery starts in '+i+'s');
+    if(recoverySkipRequested){
+      updateStatus('Recovery skipped');
+      break;
+    }
     await wait(1000);
   }
+}
+
+function skipRecovery(){
+  recoverySkipRequested = true;
+  updateStatus('Recovery skip requested');
 }
 
 /* ================= SUMMARY + CHARTS ================= */
