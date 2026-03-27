@@ -803,20 +803,13 @@ async function keyCheck(){
  const spans = Array.from(document.querySelectorAll('#kfl .s'));
 
  function showArrow(which){
-  // which: 'left' or 'right'
   const ch = which === 'left' ? '<' : '>';
-  // set surrounding flanker arrows for context
-  spans.forEach((sp,i)=>{
-    if(i < 2) sp.innerText = ch;
-    else if(i === 2) sp.innerText = ch; // center
-    else sp.innerText = ch;
-  });
-  // highlight only the center
+  spans.forEach(sp => sp.innerText = ch);
   kcenter.classList.add('highlight');
-  setTimeout(()=>kcenter.classList.remove('highlight'),250);
-}
+  setTimeout(() => kcenter.classList.remove('highlight'), 250);
+ }
 
- await new Promise(resolve=>{
+ await new Promise(resolve => {
    const pickKey = key => {
      if(key === 'f'){
        f = true;
@@ -827,32 +820,29 @@ async function keyCheck(){
        showArrow('right');
      }
 
-     kstatus.innerText = `F: ${f?"✓":""}   J: ${j?"✓":""}`;
+     kstatus.innerText = `F: ${f ? '✓' : ''}   J: ${j ? '✓' : ''}`;
 
      if(f && j){
-       // both keys pressed: stop key listening and show Start button
        document.onkeydown = null;
        const kBtnF = document.getElementById('kBtnF');
        const kBtnJ = document.getElementById('kBtnJ');
        if(kBtnF) kBtnF.onclick = null;
        if(kBtnJ) kBtnJ.onclick = null;
 
-      const startBtn = document.createElement('button');
-      startBtn.innerText = 'Start practice';
-      startBtn.id = 'startPracticeBtn';
-      startBtn.style.display = 'block';
-      startBtn.style.width = '180px';
-      startBtn.style.margin = '12px auto';
-      startBtn.style.clear = 'both';
-      startBtn.style.textAlign = 'center';
+       const startBtn = document.createElement('button');
+       startBtn.innerText = 'Start practice';
+       startBtn.id = 'startPracticeBtn';
+       startBtn.style.display = 'block';
+       startBtn.style.width = '180px';
+       startBtn.style.margin = '12px auto';
+       startBtn.style.textAlign = 'center';
        startBtn.onclick = () => {
          startBtn.remove();
          resolve();
        };
 
-      // insert button after kfl (will render centered below because it's block)
-      const kflEl = document.getElementById('kfl');
-      kflEl.insertAdjacentElement('afterend', startBtn);
+       const kflEl = document.getElementById('kfl');
+       kflEl.insertAdjacentElement('afterend', startBtn);
        kstatus.innerText += '  — press Start to begin';
      }
    };
@@ -866,61 +856,6 @@ async function keyCheck(){
    const kBtnJ = document.getElementById('kBtnJ');
    if(kBtnF) kBtnF.onclick = () => pickKey('f');
    if(kBtnJ) kBtnJ.onclick = () => pickKey('j');
-
-      const startBtn = document.createElement('button');
-      startBtn.innerText = 'Start practice';
-      startBtn.id = 'startPracticeBtn';
-      startBtn.style.display = 'block';
-      startBtn.style.width = '180px';
-      startBtn.style.margin = '12px auto';
-      startBtn.style.clear = 'both';
-      startBtn.style.textAlign = 'center';
-       startBtn.onclick = () => {
-         startBtn.remove();
-         resolve();
-       };
-
-      // insert button after kfl (will render centered below because it's block)
-      const kflEl = document.getElementById('kfl');
-      kflEl.insertAdjacentElement('afterend', startBtn);
-       kstatus.innerText += '  — press Start to begin';
-     }
-   };
- });
-}
-
-/* ================= UPLOAD TO DRIVE ================= */
-
-// ===== Drive upload via Apps Script (no sign-in) =====
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZSkofmyfHIy0N3PRbumPHWPzgGY4zRJYSIW0e1T0Y0a1vrHfnHB2DZVephF65DaOe5w/exec";
-const UPLOAD_SECRET  = "CHANGE_ME_TO_A_LONG_RANDOM_STRING"; // must match Code.gs
-
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(",")[1] || "");
-    r.onerror = reject;
-    r.readAsDataURL(blob);
-  });
-}
-
-/**
- * Sends upload request to Apps Script.
- * Returns true if the browser accepted/queued the request (NOT a server confirmation).
- */
-async function uploadCSVToAppsScript(blob, filename, tag) {
-  const dataBase64 = await blobToBase64(blob);
-
-  const payload = {
-    secret: UPLOAD_SECRET,
-    filename,
-    mime: "text/csv",
-    dataBase64,
-    tag: tag || ""
-  };
-
-  // no-cors => request is sent, but response is opaque (cannot read success/failure)
-  await fetch(APPS_SCRIPT_URL, {
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "application/json" },
